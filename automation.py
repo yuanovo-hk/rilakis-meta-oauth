@@ -7,7 +7,7 @@ import threading
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import Request, urlopen
 
@@ -38,6 +38,8 @@ def api(method, url, body=None, headers=None):
     except HTTPError as error:
         detail = error.read().decode(errors="replace")
         raise RuntimeError(f"HTTP {error.code}: {safe_error(detail)}") from None
+    except (URLError, OSError) as error:
+        raise RuntimeError(f"{method} {urlparse(url).path}: {safe_error(error)}") from None
     if "code" in result and result["code"] != 0:
         raise RuntimeError(f"Lark {result['code']}: {safe_error(result.get('msg', 'API error'))}")
     if "error" in result:
@@ -123,11 +125,20 @@ def prepare(lark, row):
         raise RuntimeError("IG貼文 must contain 1–2200 characters")
     images = []
     for attachment in attachments:
-        url = lark.short_url(attachment, rid)
+        try:
+            url = lark.short_url(attachment, rid)
+        except Exception as error:
+            raise RuntimeError(f"Resolve {attachment['name']}: {safe_error(error)}") from None
         # Deliberately omit Authorization: proves this URL works for a public client.
-        with urlopen(Request(url), timeout=30) as response:
-            mime = response.headers.get_content_type()
-            response.read(32)
+        for attempt in range(2):
+            try:
+                with urlopen(Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "image/*"}), timeout=30) as response:
+                    mime = response.headers.get_content_type()
+                    response.read(32)
+                break
+            except (URLError, OSError) as error:
+                if attempt == 1:
+                    raise RuntimeError(f"Public download {attachment['name']} ({urlparse(url).hostname}): {safe_error(error)}") from None
         if not mime.startswith("image/"):
             raise RuntimeError("Lark public download did not return an image")
         images.append({"name": attachment["name"], "mime": mime, "url": url})
