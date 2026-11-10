@@ -1,7 +1,7 @@
 import json, os, time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import Request, urlopen\nfrom urllib.error import HTTPError
 
 GRAPH="https://graph.facebook.com/v27.0"; LARK="https://open.larksuite.com/open-apis"
 BASE=os.environ["LARK_BASE_TOKEN"]; TABLE=os.environ["LARK_TABLE_ID"]
@@ -10,7 +10,7 @@ STATUS="flde84a6Iz"; CAPTION="fldoOsLRGd"; COVER="fldbVErWJZ"; MEDIA="fldv1INaWY
 def call(method,url,body=None,headers=None):
     req=Request(url, data=None if body is None else json.dumps(body).encode(), method=method,
                 headers={"Content-Type":"application/json", **(headers or {})})
-    with urlopen(req,timeout=45) as r: return json.loads(r.read().decode())
+    try:\n        with urlopen(req,timeout=45) as r: return json.loads(r.read().decode())\n    except HTTPError as e:\n        detail=e.read().decode(errors="replace")[:1000]\n        raise RuntimeError(f"HTTP {e.code}: {detail}")
 
 def lark_token():
     return call("POST",LARK+"/auth/v3/tenant_access_token/internal",
