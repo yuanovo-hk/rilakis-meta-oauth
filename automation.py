@@ -31,19 +31,21 @@ def url(v):
     if isinstance(v,list) and v: v=v[0]
     return v.get("url") if isinstance(v,dict) else None
 
-def cloudinary_url(source_url):
+def cloudinary_url(source_url, lark_auth):
+    import uuid
     from urllib.parse import quote
-    from urllib.error import HTTPError
-    form = ("file=" + quote(source_url, safe="") +
-            "&upload_preset=" + quote(os.environ["CLOUDINARY_UPLOAD_PRESET"], safe="")).encode()
+    req = Request(source_url, headers=lark_auth, method="GET")
+    with urlopen(req, timeout=60) as r:
+        blob = r.read()
+    boundary = "----codex" + uuid.uuid4().hex
+    parts = []
+    parts.append(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"upload_preset\"\r\n\r\n" + os.environ["CLOUDINARY_UPLOAD_PRESET"] + "\r\n").encode())
+    parts.append(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"lark-image.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n").encode() + blob + b"\r\n")
+    body = b"".join(parts) + ("--" + boundary + "--\r\n").encode()
     req = Request("https://api.cloudinary.com/v1_1/" + os.environ["CLOUDINARY_CLOUD_NAME"] + "/image/upload",
-                  data=form, headers={"Content-Type":"application/x-www-form-urlencoded"}, method="POST")
-    try:
-        with urlopen(req, timeout=60) as r:
-            return json.loads(r.read().decode())["secure_url"]
-    except HTTPError as e:
-        detail=e.read().decode(errors="replace")[:1000]
-        raise RuntimeError(f"Cloudinary HTTP {e.code}: {detail}")
+                  data=body, headers={"Content-Type":"multipart/form-data; boundary=" + boundary}, method="POST")
+    with urlopen(req, timeout=60) as r:
+        return json.loads(r.read().decode())["secure_url"]
 
 def run():
     lt=lark_token(); auth={"Authorization":"Bearer "+lt}
@@ -58,7 +60,7 @@ def run():
             call("PUT",f"{LARK}/bitable/v1/apps/{BASE}/tables/{TABLE}/records/{row['record_id']}",
                  {"fields":{"IG發布狀態":["發布中"]}},auth)
             ig={"Authorization":"Bearer "+os.environ["INSTAGRAM_ACCESS_TOKEN"]}
-            public_image=cloudinary_url(image)
+            public_image=cloudinary_url(image, auth)
             creation=call("POST",f"{GRAPH}/{os.environ['INSTAGRAM_ACCOUNT_ID']}/media",{"image_url":public_image,"caption":caption},ig)["id"]
             media=call("POST",f"{GRAPH}/{os.environ['INSTAGRAM_ACCOUNT_ID']}/media_publish",{"creation_id":creation},ig)["id"]
             call("PUT",f"{LARK}/bitable/v1/apps/{BASE}/tables/{TABLE}/records/{row['record_id']}",
