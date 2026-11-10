@@ -46,17 +46,17 @@ def run():
         if not image: out.append({"record_id":row["record_id"],"status":"skipped","reason":"missing cover URL"}); continue
         try:
             call("PUT",f"{LARK}/bitable/v1/apps/{BASE}/tables/{TABLE}/records/{row['record_id']}",
-                 {"fields":{STATUS:["發布中"]}},auth)
+                 {"fields":{"IG發布狀態":["發布中"]}},auth)
             ig={"Authorization":"Bearer "+os.environ["INSTAGRAM_ACCESS_TOKEN"]}
             public_image=cloudinary_url(image)
             creation=call("POST",f"{GRAPH}/{os.environ['INSTAGRAM_ACCOUNT_ID']}/media",{"image_url":public_image,"caption":caption},ig)["id"]
             media=call("POST",f"{GRAPH}/{os.environ['INSTAGRAM_ACCOUNT_ID']}/media_publish",{"creation_id":creation},ig)["id"]
             call("PUT",f"{LARK}/bitable/v1/apps/{BASE}/tables/{TABLE}/records/{row['record_id']}",
-                 {"fields":{STATUS:["已發布"],MEDIA:media,PUB:int(time.time()*1000)}},auth)
+                 {"fields":{"IG發布狀態":["已發布"],"IG媒體ID":media,"實際發布時間":int(time.time()*1000)}},auth)
             out.append({"record_id":row["record_id"],"status":"published","media_id":media})
         except Exception as e:
             call("PUT",f"{LARK}/bitable/v1/apps/{BASE}/tables/{TABLE}/records/{row['record_id']}",
-                 {"fields":{STATUS:["失敗"],ERR:str(e)[:500]}},auth)
+                 {"fields":{"IG發布狀態":["失敗"],"錯誤紀錄":str(e)[:500]}},auth)
             out.append({"record_id":row["record_id"],"status":"failed","error":str(e)[:500]})
     return {"processed":len(out),"results":out}
 
