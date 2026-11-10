@@ -33,12 +33,17 @@ def url(v):
 
 def cloudinary_url(source_url):
     from urllib.parse import quote
+    from urllib.error import HTTPError
     form = ("file=" + quote(source_url, safe="") +
             "&upload_preset=" + quote(os.environ["CLOUDINARY_UPLOAD_PRESET"], safe="")).encode()
     req = Request("https://api.cloudinary.com/v1_1/" + os.environ["CLOUDINARY_CLOUD_NAME"] + "/image/upload",
                   data=form, headers={"Content-Type":"application/x-www-form-urlencoded"}, method="POST")
-    with urlopen(req, timeout=60) as r:
-        return json.loads(r.read().decode())["secure_url"]
+    try:
+        with urlopen(req, timeout=60) as r:
+            return json.loads(r.read().decode())["secure_url"]
+    except HTTPError as e:
+        detail=e.read().decode(errors="replace")[:1000]
+        raise RuntimeError(f"Cloudinary HTTP {e.code}: {detail}")
 
 def run():
     lt=lark_token(); auth={"Authorization":"Bearer "+lt}
