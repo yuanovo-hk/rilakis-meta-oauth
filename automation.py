@@ -29,7 +29,7 @@ def s(v):
 
 def url(v):
     if isinstance(v,list) and v: v=v[0]
-    return v.get("url") if isinstance(v,dict) else None
+    return (v.get("tmp_url") or v.get("url") or v.get("download_url")) if isinstance(v,dict) else None
 
 def cloudinary_url(source_url, lark_auth):
     import uuid
