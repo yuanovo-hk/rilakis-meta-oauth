@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: rilakis-meta-oauth-callback
+    runtime: python
+    buildCommand: ""
+    startCommand: "python3 meta_oauth_callback.py"
+    plan: free
