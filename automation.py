@@ -31,9 +31,9 @@ def run():
     rows=call("GET",f"{LARK}/bitable/v1/apps/{BASE}/tables/{TABLE}/records?page_size=500",headers=auth)["data"]["items"]
     out=[]
     for row in rows:
-        f=row.get("fields",{}); status=s(f.get(STATUS))
+        f=row.get("fields",{}); status=s(f.get(STATUS) or f.get("IG發布狀態"))
         if status not in ("待發布","待发布"): continue
-        image=url(f.get(COVER)); caption=s(f.get(CAPTION))
+        image=url(f.get(COVER) or f.get("IG首圖")); caption=s(f.get(CAPTION) or f.get("IG貼文"))
         if not image: out.append({"record_id":row["record_id"],"status":"skipped","reason":"missing cover URL"}); continue
         try:
             call("PUT",f"{LARK}/bitable/v1/apps/{BASE}/tables/{TABLE}/records/{row['record_id']}",
